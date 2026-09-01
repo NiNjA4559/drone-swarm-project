@@ -1,6 +1,6 @@
 # Drone Swarm Project
 
-### 1. Generate testcases using `cd ./testcases && node . && cd ../`
+### 1. Generate testcases using `cd ./generator && node . && cd ../`
 
 ### 2. Compile using `mingw32-make build`
 

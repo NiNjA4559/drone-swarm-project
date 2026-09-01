@@ -21,22 +21,23 @@ void System::loss(int i) {
 
 // Copilot hehe
 void System::exportJSON(int tick) {
-    static bool started = false;
+    static bool firstTick = true;
 
-    if(!started) {
-        ofstream file("simulation.json", ios::out | ios::trunc);
-        file << "[\n";
-        file.close();
-        started = true;
+    if(firstTick) {
+        ofstream resetFile("visualisation/simulation.js", ios::out | ios::trunc);
+        resetFile << "const simulationData = [\n";
+        resetFile.close();
+        firstTick = false;
     }
 
-    ofstream file("simulation.json", ios::app);
-    if(started && !file.is_open()) {
-        file.open("simulation.json", ios::app);
-    }
-
-    if(file.tellp() > 0 && file.tellp() > 2) {
-        file << ",\n";
+    ofstream file("visualisation/simulation.js", ios::app);
+    if(!firstTick) {
+        // Add a comma between array entries after the first one.
+        static bool firstEntryWritten = false;
+        if(firstEntryWritten) {
+            file << ",\n";
+        }
+        firstEntryWritten = true;
     }
 
     file << "  {\n";
@@ -48,6 +49,7 @@ void System::exportJSON(int tick) {
         file << "      {\"id\": " << i
              << ", \"x\": " << children[i].loc.x
              << ", \"y\": " << children[i].loc.y
+             << ", \"ability\": " << static_cast<int>(children[i].ability)
              << ", \"functional\": " << (children[i].functional ? "true" : "false") << "}";
         if(i < children.size() - 1) file << ",";
         file << "\n";
@@ -59,7 +61,7 @@ void System::exportJSON(int tick) {
 }
 
 void System::finalizeJSON() {
-    ofstream file("simulation.json", ios::app);
-    file << "\n]\n";
+    ofstream file("visualisation/simulation.js", ios::app);
+    file << "\n];\n";
     file.close();
 }

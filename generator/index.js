@@ -14,10 +14,10 @@ const fs = require("fs");
 
 let inputText = "";
 
-const n = 5 //Math.floor(Math.random() * 26) + 25;
-const k = 5 //Math.floor(Math.random(n * n));
-const R = 2;
-const t = 10;
+const n = 10 //Math.floor(Math.random() * 26) + 25;
+const k = 13 //Math.floor(Math.random(n * n));
+const R = 7;
+const t = 20;
 
 let obj = {};
 for(let i = 0; i < n; i++) {

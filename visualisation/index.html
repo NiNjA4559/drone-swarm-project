@@ -36,6 +36,16 @@
             document.getElementById('tick').textContent = data.tick;
         }
 
+        function getDroneColor(ability) {
+            switch (ability) {
+                case 0: return '#808080';
+                case 1: return '#1e90ff';
+                case 2: return '#ff8c00';
+                case 3: return '#8a2be2';
+                default: return '#00ff00';
+            }
+        }
+
         function drawSimulation(data) {
             const gridSize = data.grid_size;
             const cellSize = canvas.width / gridSize;
@@ -62,7 +72,7 @@
                 if(entity.functional) {
                     const x = entity.x * cellSize + cellSize / 2;
                     const y = canvas.height - (entity.y * cellSize + cellSize / 2);
-                    ctx.fillStyle = '#00ff00';
+                    ctx.fillStyle = getDroneColor(entity.ability);
                     ctx.beginPath();
                     ctx.arc(x, y, 8, 0, 2 * Math.PI);
                     ctx.fill();
