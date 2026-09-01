@@ -21,21 +21,45 @@ void System::loss(int i) {
 
 // Copilot hehe
 void System::exportJSON(int tick) {
-    ofstream file("simulation_" + to_string(tick) + ".json");
-    file << "{\n";
-    file << "  \"tick\": " << tick << ",\n";
-    file << "  \"grid_size\": " << grid_size << ",\n";
-    file << "  \"entities\": [\n";
-    
+    static bool started = false;
+
+    if(!started) {
+        ofstream file("simulation.json", ios::out | ios::trunc);
+        file << "[\n";
+        file.close();
+        started = true;
+    }
+
+    ofstream file("simulation.json", ios::app);
+    if(started && !file.is_open()) {
+        file.open("simulation.json", ios::app);
+    }
+
+    if(file.tellp() > 0 && file.tellp() > 2) {
+        file << ",\n";
+    }
+
+    file << "  {\n";
+    file << "    \"tick\": " << tick << ",\n";
+    file << "    \"grid_size\": " << grid_size << ",\n";
+    file << "    \"entities\": [\n";
+
     for(int i = 0; i < children.size(); i++) {
-        file << "    {\"id\": " << i 
-             << ", \"x\": " << children[i].loc.x 
-             << ", \"y\": " << children[i].loc.y 
+        file << "      {\"id\": " << i
+             << ", \"x\": " << children[i].loc.x
+             << ", \"y\": " << children[i].loc.y
              << ", \"functional\": " << (children[i].functional ? "true" : "false") << "}";
         if(i < children.size() - 1) file << ",";
         file << "\n";
     }
-    
-    file << "  ]\n}\n";
+
+    file << "    ]\n";
+    file << "  }\n";
+    file.close();
+}
+
+void System::finalizeJSON() {
+    ofstream file("simulation.json", ios::app);
+    file << "\n]\n";
     file.close();
 }

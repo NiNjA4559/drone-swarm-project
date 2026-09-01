@@ -19,28 +19,43 @@
     
     <script>
         let currentTick = 0;
+        let frames = [];
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        
-        async function loadTick(tick) {
+
+        async function loadSimulation() {
             try {
-                const response = await fetch(`simulation_${tick}.json`);
+                const response = await fetch('simulation.json');
                 const data = await response.json();
-                drawSimulation(data);
-                document.getElementById('tick').textContent = tick;
-            } catch(e) {
-                console.log('Tick ' + tick + ' not found');
+                frames = Array.isArray(data) ? data : [data];
+                if (frames.length > 0) {
+                    loadTick(0);
+                }
+            } catch (e) {
+                console.log('Simulation file not found');
             }
         }
-        
+
+        function loadTick(index) {
+            if (!frames[index]) {
+                console.log('Tick ' + index + ' not found');
+                return;
+            }
+
+            const data = frames[index];
+            drawSimulation(data);
+            currentTick = index;
+            document.getElementById('tick').textContent = data.tick;
+        }
+
         function drawSimulation(data) {
             const gridSize = data.grid_size;
             const cellSize = canvas.width / gridSize;
-            
+
             // Clear canvas
             ctx.fillStyle = 'white';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
+
             // Draw grid
             ctx.strokeStyle = '#ddd';
             for(let i = 0; i <= gridSize; i++) {
@@ -53,7 +68,7 @@
                 ctx.lineTo(canvas.width, i * cellSize);
                 ctx.stroke();
             }
-            
+
             // Draw entities
             data.entities.forEach(entity => {
                 if(entity.functional) {
@@ -70,20 +85,20 @@
                 }
             });
         }
-        
+
         function nextTick() {
-            currentTick++;
-            loadTick(currentTick);
-        }
-        
-        function prevTick() {
-            if(currentTick > 0) {
-                currentTick--;
-                loadTick(currentTick);
+            if (currentTick < frames.length - 1) {
+                loadTick(currentTick + 1);
             }
         }
-        
-        loadTick(0);
+
+        function prevTick() {
+            if (currentTick > 0) {
+                loadTick(currentTick - 1);
+            }
+        }
+
+        loadSimulation();
     </script>
 </body>
 </html>

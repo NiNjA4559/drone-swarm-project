@@ -11,7 +11,7 @@ build:
 	$(CXX) $(CXXFLAGS) $(SRCS) -o $(TARGET)
 
 run:
-	./$(TARGET) < $(INPUT)
+	$(TARGET) < $(INPUT)
 
 clean:
 	del /f /q $(TARGET) 2>nul || rm -f $(TARGET)

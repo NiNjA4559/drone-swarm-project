@@ -20,4 +20,5 @@ class System {
     void loss(int i);
 
     void exportJSON(int tick);
+    void finalizeJSON();
 };

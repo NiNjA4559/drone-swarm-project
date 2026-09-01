@@ -46,9 +46,11 @@ int main() {
             }
 
         }
-        // Create JSON file for visualisation
+        // Create a single JSON history file for visualisation
         model.exportJSON(tick);
     }
+
+    model.finalizeJSON();
     return 0;
 }
 
