@@ -1,6 +1,7 @@
 CXX = g++
 CXXFLAGS = -I include
 SRCS = main.cpp $(wildcard classes/*.cpp) $(wildcard helpers/*.cpp)
+INPUT = input.txt
 TARGET = main.exe
 
 # Default rule: builds and immediately runs
@@ -10,7 +11,7 @@ build:
 	$(CXX) $(CXXFLAGS) $(SRCS) -o $(TARGET)
 
 run:
-	./$(TARGET)
+	./$(TARGET) < $(INPUT)
 
 clean:
 	del /f /q $(TARGET) 2>nul || rm -f $(TARGET)
