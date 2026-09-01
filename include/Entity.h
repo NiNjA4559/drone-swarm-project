@@ -1,6 +1,9 @@
+#ifndef ENTITY_H
+#define ENTITY_H
 #include "TaskType.h"
-#include "Task.h"
 #include "Point.h"
+
+class Task;
 
 class Entity {
     public:
@@ -9,7 +12,10 @@ class Entity {
     Point loc;
     TaskType ability;
     bool idle;
-    Task job;
+    Task* job;
     
+    Entity();
     Entity(int _id, TaskType _ability, Point _loc);
 };
+
+#endif

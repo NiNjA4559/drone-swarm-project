@@ -1,0 +1,89 @@
+<!-- are copilot aap? -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Drone Swarm Simulation</title>
+    <style>
+        canvas { border: 1px solid black; display: block; margin: 20px; }
+        body { font-family: Arial; padding: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Drone Swarm Simulation</h1>
+    <div>
+        Tick: <span id="tick">0</span> | 
+        <button onclick="prevTick()">Previous</button>
+        <button onclick="nextTick()">Next</button>
+    </div>
+    <canvas id="canvas" width="600" height="600"></canvas>
+    
+    <script>
+        let currentTick = 0;
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        async function loadTick(tick) {
+            try {
+                const response = await fetch(`simulation_${tick}.json`);
+                const data = await response.json();
+                drawSimulation(data);
+                document.getElementById('tick').textContent = tick;
+            } catch(e) {
+                console.log('Tick ' + tick + ' not found');
+            }
+        }
+        
+        function drawSimulation(data) {
+            const gridSize = data.grid_size;
+            const cellSize = canvas.width / gridSize;
+            
+            // Clear canvas
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = '#ddd';
+            for(let i = 0; i <= gridSize; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * cellSize, 0);
+                ctx.lineTo(i * cellSize, canvas.height);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i * cellSize);
+                ctx.lineTo(canvas.width, i * cellSize);
+                ctx.stroke();
+            }
+            
+            // Draw entities
+            data.entities.forEach(entity => {
+                if(entity.functional) {
+                    const x = entity.x * cellSize + cellSize / 2;
+                    const y = canvas.height - (entity.y * cellSize + cellSize / 2);
+                    ctx.fillStyle = '#00ff00';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 8, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.fillStyle = 'black';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(entity.id, x, y + 4);
+                }
+            });
+        }
+        
+        function nextTick() {
+            currentTick++;
+            loadTick(currentTick);
+        }
+        
+        function prevTick() {
+            if(currentTick > 0) {
+                currentTick--;
+                loadTick(currentTick);
+            }
+        }
+        
+        loadTick(0);
+    </script>
+</body>
+</html>
