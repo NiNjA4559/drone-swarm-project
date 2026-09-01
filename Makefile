@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -I include
-SRCS = main.cpp $(wildcard src/*.cpp)
+SRCS = main.cpp $(wildcard classes/*.cpp) $(wildcard helpers/*.cpp)
 TARGET = main.exe
 
 # Default rule: builds and immediately runs

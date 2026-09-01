@@ -5,6 +5,7 @@
 class Entity {
     public:
     int id;
+    bool functional;
     Point loc;
     TaskType ability;
     bool idle;
