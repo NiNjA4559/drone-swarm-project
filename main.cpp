@@ -10,7 +10,7 @@ int main() {
 
     //
     int n, k, R, t, q;
-    int ability, x, y, id, query_type;
+    int ability, x, y, id, w, query_type;
 
     cin >> n >> k >> R >> t;
 
@@ -60,7 +60,7 @@ int main() {
 for all t in [1, t]:
 2. q (followed by q lines containing one of the three types of queries on all q lines)
     1 i (Loss of ith entity)
-    2 x y (New task available at (x, y))
+    2 w x y (New task of type w available at (x, y))
     3 i x y (ith entity that was lost previously is found working at (x, y))
 */
 
