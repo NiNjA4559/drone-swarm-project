@@ -6,11 +6,18 @@
 using namespace std;
 class System {
     public:
+
     int grid_size;
     int entity_count;
     int range;
+
     vector<Entity> children;
     vector<vector<bool>> adj;
+    // do i need a vector for the grid?
+    // let's try it out
+
+    vector<vector<int>> grid; // [y, x] => y rows, x columns
+
     vector<Task> tasks;
 
     System(int _grid_size, int _entity_count, int _range);

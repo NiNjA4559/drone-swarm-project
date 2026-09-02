@@ -8,6 +8,7 @@ System::System(int _grid_size, int _entity_count, int _range) {
     this->entity_count = _entity_count;
     this->range = _range;
     this->adj.resize(_entity_count, vector<bool> (_entity_count, false));
+    this->grid.resize(_grid_size, vector<int> (_grid_size, -1));
 }
 
 bool System::connected(Point a, Point b, int _range) {

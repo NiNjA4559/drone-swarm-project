@@ -19,6 +19,7 @@ int main() {
     for(int i = 0; i < k; i++) {  // O(k)
         cin >> ability >> x >> y;
         model.children.push_back(Entity(i, static_cast<TaskType>(ability), Point(x, y)));
+        model.grid[y][x] = i;
     }
 
     for(int i = 0; i < k; i++){
