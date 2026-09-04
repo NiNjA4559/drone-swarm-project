@@ -1,4 +1,6 @@
 #include <vector>
+#include <unordered_map>
+#include <unordered_set>
 #include "Entity.h"
 #include "Point.h"
 #include "Task.h"
@@ -12,13 +14,11 @@ class System {
     int range;
 
     vector<Entity> children;
-    vector<vector<bool>> adj;
-    // do i need a vector for the grid?
-    // let's try it out
-
-    vector<vector<int>> grid; // [y, x] => y rows, x columns
+    vector<vector<int>> adj;
 
     vector<Task> tasks;
+
+    unordered_map<int, vector<int>> grid; // key = y * grid_size + x
 
     System(int _grid_size, int _entity_count, int _range);
 
@@ -26,6 +26,17 @@ class System {
 
     void loss(int i);
 
+    Entity findNearestEntity(Task job);
+
+    void addTask(Task job);
+
+    void gossip(Task job);
+
+    void assignTask(Task job, int id);
+
     void exportJSON(int tick);
     void finalizeJSON();
+
+    private:
+    vector<bool> vis;
 };

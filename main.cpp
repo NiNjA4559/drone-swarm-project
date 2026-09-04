@@ -19,32 +19,40 @@ int main() {
     for(int i = 0; i < k; i++) {  // O(k)
         cin >> ability >> x >> y;
         model.children.push_back(Entity(i, static_cast<TaskType>(ability), Point(x, y)));
-        model.grid[y][x] = i;
+        model.grid[y * n + x].push_back(i);
     }
 
     for(int i = 0; i < k; i++){
         for(int j = i + 1; j < k; j++) {  // O(k^2)
             if(System::connected(model.children[i].loc, model.children[j].loc, R)) {
-                model.adj[i][j] = true;
-                model.adj[j][i] = true;
+                model.adj[i].push_back(j);
+                model.adj[j].push_back(i);
             }
         }
     }
 
     for(int tick = 1; tick <= t; tick++) {
+        cout << "Tick " << tick << ":\n";
         cin >> q;
         while(q--) {
 
             cin >> query_type;
 
+            const auto start = chrono::steady_clock::now();
+
             if(query_type == 1) {
                 cin >> id;
                 model.loss(id); // to be implemented later, after task allocation
             } else if(query_type == 2) {
-
+                cin >> w >> x >> y;
             } else if(query_type == 3) {
-
+                cin >> id >> x >> y;
             }
+
+            const auto end = chrono::steady_clock::now();
+
+            auto duration_ns = chrono::duration_cast<chrono::nanoseconds>(end - start);
+            cout << "Query Type: " << query_type << ", " << "Time: " << duration_ns.count() << " ns\n";
 
         }
         // Create a single JSON history file for visualisation
