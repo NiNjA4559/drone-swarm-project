@@ -1,9 +1,11 @@
 #ifndef TASK_H
 #define TASK_H
 
+#include <vector>
 #include "TaskType.h"
 #include "Point.h"
-#include "Entity.h"
+
+using namespace std;
 
 class Task {
     public:

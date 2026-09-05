@@ -2,8 +2,7 @@
 #define ENTITY_H
 #include "TaskType.h"
 #include "Point.h"
-
-class Task;
+#include "Task.h"
 
 class Entity {
     public:

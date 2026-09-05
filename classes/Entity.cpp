@@ -1,6 +1,4 @@
-#include "TaskType.h"
-#include "Task.h"
-#include "Point.h"
+#include "Entity.h"
 
 Entity::Entity() : id(-1), ability(TaskType::None), loc(-1, -1) {}
 
