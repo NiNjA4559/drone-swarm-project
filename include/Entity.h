@@ -12,7 +12,7 @@ class Entity {
     Point loc;
     TaskType ability;
     bool idle;
-    Task* job;
+    Task job;
     
     Entity();
     Entity(int _id, TaskType _ability, Point _loc);

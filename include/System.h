@@ -28,11 +28,11 @@ class System {
 
     Entity findNearestEntity(Task job);
 
-    void addTask(Task job);
+    void addTask(Task &job);
 
-    void gossip(Task job);
+    void gossip(Task &job, int source);
 
-    void assignTask(Task job, int id);
+    void assignTask(Task &job, int target);
 
     void exportJSON(int tick);
     void finalizeJSON();

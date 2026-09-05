@@ -38,7 +38,7 @@ Entity System::findNearestEntity(Task job) {
 
 }
 
-void System::gossip(Task job) {
+void System::gossip(Task &job, int source) {
 
     Entity nearest_entity = findNearestEntity(job);
 
@@ -46,16 +46,34 @@ void System::gossip(Task job) {
 
     queue<int> q;
 
+    fill(vis.begin(), vis.end(), false);
+
+    q.push(source);
+
     while(!q.empty()) {
-        
+        int curr_id = q.front();
+        vis[curr_id] = true;
+        q.pop();
+
+        job.knownEntities.push_back(curr_id);
+
+        for(const int &neighbour : adj[curr_id]) {
+            if(vis[neighbour]) continue;
+            q.push(neighbour);
+        }
+
     }
 }
 
-void System::assignTask(Task job, int id) {
-
+void System::assignTask(Task &job, int target) {
+    job.assigned = true;
+    job.assignedTo = target;
+    
+    this->children[target].idle = false;
+    this->children[target].job = job;
 }
 
-void System::addTask(Task job) {
+void System::addTask(Task &job) {
     this->tasks.push_back(job);
 }
 

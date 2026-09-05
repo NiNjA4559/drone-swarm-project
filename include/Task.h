@@ -11,7 +11,8 @@ class Task {
     Point loc;
     bool completed;
     bool assigned;
-    Entity* assignedTo;
+    vector<int> knownEntities;
+    int assignedTo;
 
     Task();
     Task(Point _loc, TaskType _type);
