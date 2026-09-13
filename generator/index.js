@@ -14,10 +14,10 @@ const fs = require("fs");
 
 let inputText = "";
 
-const n = 10 //Math.floor(Math.random() * 26) + 25;
-const k = 13 //Math.floor(Math.random(n * n));
+const n = 20 //Math.floor(Math.random() * 26) + 25;
+const k = 20 //Math.floor(Math.random(n * n));
 const R = 7;
-const t = 20;
+const t = 100;
 
 let obj = {};
 for(let i = 0; i < n; i++) {
@@ -34,20 +34,32 @@ while(points.size < k) {
 //console.log(n, k, R, t);
 inputText += [n, k, R, t].join(" ") + "\n";
 
+let droneIndex = 0;
 for(let el of points) {
     let arr = el.split(",").map(Number);
-    //console.log(Math.floor(Math.random() * 3) + 1, arr[0], arr[1]);
-    inputText += [Math.floor(Math.random() * 3) + 1, arr[0], arr[1]].join(" ") + "\n";
+    const ability = (droneIndex++ % 3) + 1;
+    //console.log(ability, arr[0], arr[1]);
+    inputText += [ability, arr[0], arr[1]].join(" ") + "\n";
 }
 let lost_entities = {};
+let next_task_id = 0;
 for(let i = 0; i < t; i++) {
-    let p = Math.floor(Math.random() * 3) + 1;
+    const queryRoll = Math.random();
+    let p = queryRoll < 0.4 ? 0 : queryRoll < 0.8 ? 1 : 2;
 
     //console.log(p)
     inputText += p + "\n";
 
     for(let j = 0; j < p; j++) {
-        let qtype = Math.floor(Math.random() * 2) + 1;
+        let qtype;
+        const canLoseEntity = Object.keys(lost_entities).length < k;
+
+        if(canLoseEntity) {
+            qtype = Math.random() < 0.2 ? 1 : 2;
+        } else {
+            qtype = 2;
+        }
+
         if(qtype == 1 && Object.keys(lost_entities).length == k) qtype++;
         if(qtype == 1) {
             let lost_pos = Math.floor(Math.random() * (k - Object.keys(lost_entities).length));
@@ -71,7 +83,13 @@ for(let i = 0; i < t; i++) {
         } else if(qtype == 2) {
             
             //console.log(qtype, Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * n), Math.floor(Math.random() * n))
-            inputText += [qtype, Math.floor(Math.random() * 3) + 1, Math.floor(Math.random() * n), Math.floor(Math.random() * n)].join(" ") + "\n";
+            inputText += [
+                qtype,
+                next_task_id++,
+                Math.floor(Math.random() * 3) + 1,
+                Math.floor(Math.random() * n),
+                Math.floor(Math.random() * n)
+            ].join(" ") + "\n";
 
         } else if(qtype == 3) {
             // implement it later cuz then i will have to check if the come backies location is already occupied or not

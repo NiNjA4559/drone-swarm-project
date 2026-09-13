@@ -10,6 +10,7 @@ using namespace std;
 class Task {
     public:
     TaskType type;
+    int id;
     Point loc;
     bool completed;
     bool assigned;
@@ -17,7 +18,7 @@ class Task {
     int assignedTo;
 
     Task();
-    Task(Point _loc, TaskType _type);
+    Task(int _id, Point _loc, TaskType _type);
 };
 
 #endif

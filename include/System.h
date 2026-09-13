@@ -4,6 +4,9 @@
 #include "Entity.h"
 #include "Point.h"
 #include "Task.h"
+#include "TaskKey.h"
+
+using TaskMap = SlotMap::static_slot_map_st<TaskKey, Task, MAX_ACTIVE_TASKS>;
 
 using namespace std;
 class System {
@@ -16,23 +19,29 @@ class System {
     vector<Entity> children;
     vector<vector<int>> adj;
 
-    vector<Task> tasks;
+    TaskMap tasks;
 
     unordered_map<int, vector<int>> grid; // key = y * grid_size + x
 
     System(int _grid_size, int _entity_count, int _range);
 
-    static bool connected(Point a, Point b, int _range);
+    static bool connected(const Point &a, const Point &b, int _range);
+
+    static int distance(const Point &a, const Point &b);
 
     void loss(int i);
 
-    Entity findNearestEntity(Task job);
+    int findNearestEntity(const Task& job) const;
 
-    void addTask(Task &job);
+    void addTask(const Task &job);
 
     void gossip(Task &job, int source);
 
-    void assignTask(Task &job, int target);
+    void assignTask(TaskKey taskKey, int target);
+
+    void assignPendingTasks();
+
+    void moveEntities();
 
     void exportJSON(int tick);
     void finalizeJSON();

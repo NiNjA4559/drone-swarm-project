@@ -4,36 +4,72 @@
 <head>
     <title>Drone Swarm Simulation</title>
     <style>
-        canvas { border: 1px solid black; display: block; margin: 20px; }
+        canvas { border: 1px solid black; display: block; margin: 20px 0; }
         body { font-family: Arial; padding: 20px; }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 32px;
+        }
+        #tick {
+            display: inline-block;
+            width: 72px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+        .controls button {
+            width: 82px;
+            height: 30px;
+        }
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: 8px;
+        }
+        #speed {
+            width: 110px;
+        }
+        #speed-value {
+            display: inline-block;
+            width: 34px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
     </style>
 </head>
 <body>
     <h1>Drone Swarm Simulation</h1>
-    <div>
-        Tick: <span id="tick">0</span> | 
+    <div class="controls">
+        <span>Tick:</span>
+        <span id="tick">0</span>
         <button onclick="prevTick()">Previous</button>
         <button onclick="nextTick()">Next</button>
+        <button id="autoplay" onclick="toggleAutoplay()">Autoplay</button>
+        <label class="speed-control" for="speed">
+            <span>Speed</span>
+            <input id="speed" type="range" min="0.25" max="3" step="0.25" value="1" oninput="setAnimationSpeed(this.value)">
+            <span id="speed-value">1x</span>
+        </label>
     </div>
     <canvas id="canvas" width="600" height="600"></canvas>
     
     <script src="./simulation.js"></script>
     <script>
-        let currentTick = 0;
-        let frames = simulationData || [];
+        const frames = simulationData || [];
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+        const baseAnimationDuration = 650;
+        let currentTick = 0;
+        let animationFrame = null;
+        let autoplaying = false;
+        let autoplayTimer = null;
+        let animationSpeed = 1;
 
-        function loadTick(index) {
-            if (!frames[index]) {
-                console.log('Tick ' + index + ' not found');
-                return;
-            }
-
-            const data = frames[index];
-            drawSimulation(data);
-            currentTick = index;
-            document.getElementById('tick').textContent = data.tick;
+        function setAnimationSpeed(value) {
+            animationSpeed = Number(value);
+            document.getElementById('speed-value').textContent = animationSpeed + 'x';
         }
 
         function getDroneColor(ability) {
@@ -42,63 +78,254 @@
                 case 1: return '#1e90ff';
                 case 2: return '#ff8c00';
                 case 3: return '#8a2be2';
-                default: return '#00ff00';
+                default: return '#00a896';
             }
         }
 
-        function drawSimulation(data) {
-            const gridSize = data.grid_size;
-            const cellSize = canvas.width / gridSize;
+        function getCellOffsets(data) {
+            const groups = new Map();
+            const offsets = new Map();
 
-            // Clear canvas
-            ctx.fillStyle = 'white';
+            data.entities.forEach(entity => {
+                const cell = entity.x + ',' + entity.y;
+                if (!groups.has(cell)) groups.set(cell, []);
+                groups.get(cell).push(entity);
+            });
+
+            groups.forEach(entities => {
+                entities.sort((first, second) => first.id - second.id);
+                const spacing = Math.min(18, (canvas.width / data.grid_size) * 0.28);
+                const columns = Math.ceil(Math.sqrt(entities.length));
+                const rows = Math.ceil(entities.length / columns);
+                const centerColumn = (columns - 1) / 2;
+                const centerRow = (rows - 1) / 2;
+
+                entities.forEach((entity, index) => {
+                    const column = index % columns;
+                    const row = Math.floor(index / columns);
+                    offsets.set(entity.id, {
+                        x: (column - centerColumn) * spacing,
+                        y: (row - centerRow) * spacing
+                    });
+                });
+            });
+
+            return offsets;
+        }
+
+        function getTaskOffsets(data) {
+            const groups = new Map();
+            const offsets = new Map();
+
+            (data.tasks || []).forEach(task => {
+                const cell = task.x + ',' + task.y;
+                if (!groups.has(cell)) groups.set(cell, []);
+                groups.get(cell).push(task);
+            });
+
+            groups.forEach(tasks => {
+                tasks.sort((first, second) => first.id - second.id);
+                const cellSize = canvas.width / data.grid_size;
+                const spacing = Math.min(14, cellSize * 0.22);
+                const columns = Math.ceil(Math.sqrt(tasks.length));
+                const centerColumn = (columns - 1) / 2;
+                const centerRow = (Math.ceil(tasks.length / columns) - 1) / 2;
+
+                tasks.forEach((task, index) => {
+                    offsets.set(task.id, {
+                        x: (index % columns - centerColumn) * spacing,
+                        y: (Math.floor(index / columns) - centerRow) * spacing
+                    });
+                });
+            });
+
+            return offsets;
+        }
+
+        function getEntityPosition(entity, data, offsets, progress) {
+            const cellSize = canvas.width / data.grid_size;
+            const offset = offsets.get(entity.id) || { x: 0, y: 0 };
+            return {
+                x: entity.x * cellSize + cellSize / 2 + offset.x,
+                y: canvas.height - (entity.y * cellSize + cellSize / 2) + offset.y,
+                progress
+            };
+        }
+
+        function drawGrid(data) {
+            const cellSize = canvas.width / data.grid_size;
+
+            ctx.fillStyle = '#f7f8fa';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#d9dee7';
+            ctx.lineWidth = 1;
 
-            // Draw grid
-            ctx.strokeStyle = '#ddd';
-            for(let i = 0; i <= gridSize; i++) {
+            for(let index = 0; index <= data.grid_size; index++) {
                 ctx.beginPath();
-                ctx.moveTo(i * cellSize, 0);
-                ctx.lineTo(i * cellSize, canvas.height);
+                ctx.moveTo(index * cellSize, 0);
+                ctx.lineTo(index * cellSize, canvas.height);
                 ctx.stroke();
                 ctx.beginPath();
-                ctx.moveTo(0, i * cellSize);
-                ctx.lineTo(canvas.width, i * cellSize);
+                ctx.moveTo(0, index * cellSize);
+                ctx.lineTo(canvas.width, index * cellSize);
                 ctx.stroke();
             }
+        }
 
-            // Draw entities
-            data.entities.forEach(entity => {
-                if(entity.functional) {
-                    const x = entity.x * cellSize + cellSize / 2;
-                    const y = canvas.height - (entity.y * cellSize + cellSize / 2);
-                    ctx.fillStyle = getDroneColor(entity.ability);
+        function getTaskTypeColor(type) {
+            return getDroneColor(type);
+        }
+
+        function drawTasks(data, entityPositions) {
+            const cellSize = canvas.width / data.grid_size;
+            const taskOffsets = getTaskOffsets(data);
+
+            (data.tasks || []).forEach(task => {
+                const offset = taskOffsets.get(task.id) || { x: 0, y: 0 };
+                const x = task.x * cellSize + cellSize / 2 + offset.x;
+                const y = canvas.height - (task.y * cellSize + cellSize / 2) + offset.y;
+                const assignedPosition = entityPositions.get(task.assigned_to);
+
+                if (task.assigned && assignedPosition) {
+                    ctx.strokeStyle = '#7b8190';
+                    ctx.setLineDash([5, 4]);
                     ctx.beginPath();
-                    ctx.arc(x, y, 8, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.fillStyle = 'black';
-                    ctx.font = '12px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(entity.id, x, y + 4);
+                    ctx.moveTo(assignedPosition.x, assignedPosition.y);
+                    ctx.lineTo(x, y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
                 }
+
+                ctx.fillStyle = getTaskTypeColor(task.type);
+                ctx.fillRect(x - 6, y - 6, 12, 12);
+                ctx.fillStyle = '#20252d';
+                ctx.font = '11px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('T' + task.id, x, y - 10);
             });
         }
 
-        function nextTick() {
-            if (currentTick < frames.length - 1) {
-                loadTick(currentTick + 1);
+        function drawEntities(data, positions) {
+            positions.forEach((position, entity) => {
+                ctx.fillStyle = entity.functional ? getDroneColor(entity.ability) : '#9aa0aa';
+                ctx.beginPath();
+                ctx.arc(position.x, position.y, 8, 0, 2 * Math.PI);
+                ctx.fill();
+
+                if (!entity.functional) {
+                    ctx.strokeStyle = '#b00020';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(position.x - 6, position.y - 6);
+                    ctx.lineTo(position.x + 6, position.y + 6);
+                    ctx.moveTo(position.x + 6, position.y - 6);
+                    ctx.lineTo(position.x - 6, position.y + 6);
+                    ctx.stroke();
+                }
+
+                ctx.fillStyle = '#20252d';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(entity.id, position.x, position.y + 4);
+            });
+        }
+
+        function drawSimulation(startData, endData, progress) {
+            const startOffsets = getCellOffsets(startData);
+            const endOffsets = getCellOffsets(endData);
+            const startEntities = new Map(startData.entities.map(entity => [entity.id, entity]));
+            const positions = new Map();
+            const endPositions = new Map();
+
+            endData.entities.forEach(endEntity => {
+                const startEntity = startEntities.get(endEntity.id) || endEntity;
+                const startPosition = getEntityPosition(startEntity, startData, startOffsets, progress);
+                const endPosition = getEntityPosition(endEntity, endData, endOffsets, progress);
+                const position = {
+                    x: startPosition.x + (endPosition.x - startPosition.x) * progress,
+                    y: startPosition.y + (endPosition.y - startPosition.y) * progress
+                };
+                positions.set(endEntity, position);
+                endPositions.set(endEntity.id, position);
+            });
+
+            drawGrid(endData);
+            drawTasks(endData, endPositions);
+            drawEntities(endData, positions);
+            document.getElementById('tick').textContent = progress < 1
+                ? startData.tick + ' -> ' + endData.tick
+                : endData.tick;
+        }
+
+        function renderFrame(index) {
+            drawSimulation(frames[index], frames[index], 1);
+            currentTick = index;
+        }
+
+        function animateTo(index, onComplete) {
+            if(index < 0 || index >= frames.length || index === currentTick) {
+                if(onComplete) onComplete();
+                return;
             }
+            if(animationFrame !== null) cancelAnimationFrame(animationFrame);
+
+            const startIndex = currentTick;
+            const startTime = performance.now();
+            const animationDuration = baseAnimationDuration / animationSpeed;
+
+            function animate(timestamp) {
+                const progress = Math.min(1, (timestamp - startTime) / animationDuration);
+                drawSimulation(frames[startIndex], frames[index], progress);
+
+                if(progress < 1) {
+                    animationFrame = requestAnimationFrame(animate);
+                } else {
+                    animationFrame = null;
+                    currentTick = index;
+                    document.getElementById('tick').textContent = frames[index].tick;
+                    if(onComplete) onComplete();
+                }
+            }
+
+            animationFrame = requestAnimationFrame(animate);
+        }
+
+        function nextTick() {
+            animateTo(currentTick + 1);
         }
 
         function prevTick() {
-            if (currentTick > 0) {
-                loadTick(currentTick - 1);
-            }
+            animateTo(currentTick - 1);
         }
 
-        if (frames.length > 0) {
-            loadTick(0);
+        function toggleAutoplay() {
+            if(autoplaying) {
+                autoplaying = false;
+                clearTimeout(autoplayTimer);
+                autoplayTimer = null;
+                document.getElementById('autoplay').textContent = 'Autoplay';
+                return;
+            }
+
+            autoplaying = true;
+            document.getElementById('autoplay').textContent = 'Pause';
+            playNextTick();
         }
+
+        function playNextTick() {
+            if(!autoplaying) return;
+
+            if(currentTick >= frames.length - 1) {
+                toggleAutoplay();
+                return;
+            }
+
+            animateTo(currentTick + 1, () => {
+                autoplayTimer = setTimeout(playNextTick, 250 / animationSpeed);
+            });
+        }
+
+        if(frames.length > 0) renderFrame(0);
     </script>
 </body>
 </html>
