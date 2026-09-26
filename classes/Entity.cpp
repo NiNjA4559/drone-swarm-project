@@ -6,7 +6,8 @@ Entity::Entity()
       loc(-1, -1),
       idle(true),
       functional(false),
-      job(std::nullopt) {}
+      job(std::nullopt),
+      leader(-1) {}
 
 Entity::Entity(int _id, TaskType _ability, Point _loc) 
     : id(_id),
@@ -14,4 +15,5 @@ Entity::Entity(int _id, TaskType _ability, Point _loc)
       loc(_loc),
       idle(true),
       functional(true),
-      job(std::nullopt) {}
+      job(std::nullopt),
+      leader(_id) {}

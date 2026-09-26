@@ -19,7 +19,7 @@ int main() {
 
     System model(n, k, R);
 
-    for(int i = 0; i < k; i++) {  // O(k)
+    for(int i = 0; i < k; i++) {
         if(!(cin >> ability >> x >> y)) {
             cerr << "Input ended while reading entities\n";
             return 1;
@@ -28,14 +28,8 @@ int main() {
         model.grid[y * n + x].push_back(i);
     }
 
-    for(int i = 0; i < k; i++){
-        for(int j = i + 1; j < k; j++) {  // O(k^2)
-            if(System::connected(model.children[i].loc, model.children[j].loc, R)) {
-                model.adj[i].push_back(j);
-                model.adj[j].push_back(i);
-            }
-        }
-    }
+    model.rebuildAdjacency();
+    //model.gossip();
 
     for(int tick = 1; tick <= t; tick++) {
         cout << "Tick " << tick << ":\n";
@@ -43,6 +37,9 @@ int main() {
             cerr << "Input ended before tick " << tick << "\n";
             return 1;
         }
+        const int tickQueryCount = q;
+        long long queryTimeNs = 0;
+        const auto tickStart = chrono::steady_clock::now();
         while(q--) {
 
             if(!(cin >> query_type)) {
@@ -75,14 +72,21 @@ int main() {
             const auto end = chrono::steady_clock::now();
 
             auto duration_ns = chrono::duration_cast<chrono::nanoseconds>(end - start);
+            queryTimeNs += duration_ns.count();
             cout << "Query Type: " << query_type << ", " << "Time: " << duration_ns.count() << " ns\n";
 
         }
 
         model.moveEntities();
+        model.rebuildAdjacency();
+        model.gossip();
+        model.assignPendingTasks();
+
+        const auto tickEnd = chrono::steady_clock::now();
+        const auto simulationTimeNs = chrono::duration_cast<chrono::nanoseconds>(tickEnd - tickStart).count();
 
         // Create a single JSON history file for visualisation
-        model.exportJSON(tick);
+        model.exportJSON(tick, queryTimeNs, simulationTimeNs, tickQueryCount);
     }
 
     model.finalizeJSON();

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <fstream>
 #include <sstream>
+#include <type_traits>
 #include "System.h"
 #include "SlotMap.hpp"
 
@@ -30,11 +31,17 @@ int System::distance(const Point &a, const Point &b) {
     return abs(a.x - b.x) + std::abs(a.y - b.y);
 };
 
-void System::loss(int i) {
-    if(i < 0 || i >= static_cast<int>(children.size())) {
-        return;
+bool System::matchesTask(const Task &job, const auto &ability) {
+    using type = std::remove_cvref_t<decltype(ability)>;
+    if constexpr(is_same_v<type, TaskType>) {
+        return ability == job.type;
+    } else if constexpr(is_same_v<type, vector<TaskType>>) {
+        return ranges::contains(ability, job.type); 
     }
+    return true;
+};
 
+void System::loss(int i) {
     Entity& entity = children[i];
     entity.functional = false;
     if(!entity.idle) {
@@ -43,16 +50,16 @@ void System::loss(int i) {
         if(task != nullptr) {
             task->assigned = false;
             task->assignedTo = -1;
+            if(task->leader == i) task->leader = -1;
         }
 
         entity.job.reset();
     }
 
     entity.idle = true;
-    assignPendingTasks();
 }
 
-int System::findNearestEntity(const Task &job) const {
+int System::findNearestEntity(const Task &job) {
 
     // Brute-force find
 
@@ -61,43 +68,90 @@ int System::findNearestEntity(const Task &job) const {
 
     for(const auto &entity : this->children) {
         if(!entity.functional ||
-       !entity.idle ||
-       entity.ability != job.type) {
-        continue;
-    }
+        !entity.idle ||
+        !this->matchesTask(job, entity.ability) ||
+        (job.leader != -1 && entity.leader != job.leader)) {
+            continue;
+        }
 
-    const int currentDistance = distance(job.loc, entity.loc);
+        const int currentDistance = distance(job.loc, entity.loc);
 
-    if(currentDistance < dist) {
-        nearest_entity = entity.id;
-        dist = currentDistance;
-    }
+        if(currentDistance < dist) {
+            nearest_entity = entity.id;
+            dist = currentDistance;
+        }
     }
     return nearest_entity;
 
 }
 
-void System::gossip(Task &job, int source) {
-    fill(vis.begin(), vis.end(), false);
+void System::gossip() {
 
     queue<int> q;
-
     fill(vis.begin(), vis.end(), false);
 
-    q.push(source);
+    for(int i = 0; i < entity_count; i++) {
 
-    while(!q.empty()) {
-        int curr_id = q.front();
-        vis[curr_id] = true;
-        q.pop();
+        if(vis[i] || !this->children[i].functional) continue;
 
-        job.knownEntities.push_back(curr_id);
+        int leader = i;
+        vector<int> topology;
 
-        for(const int &neighbour : adj[curr_id]) {
-            if(vis[neighbour]) continue;
-            q.push(neighbour);
+        topology.push_back(i);
+        q.push(i);
+        vis[i] = true;
+        while(!q.empty()) {
+            int curr_id = q.front();
+            q.pop();
+
+            for(const int &neighbour : adj[curr_id]) {
+                if(!this->children[neighbour].functional ||
+                    vis[neighbour]) continue;
+                
+                leader = min(leader, neighbour);  // Elect the entity with the lowest index as the leader
+                vis[neighbour] = true;
+                topology.push_back(neighbour);
+                q.push(neighbour);
+            }
+
+        }
+        for(int &x : topology) {
+            Entity& entity = this->children[x];
+            const int oldLeader = entity.leader;
+
+            if(oldLeader != leader) {
+                if(entity.job.has_value()) {
+                    Task* task = tasks.try_at(entity.job.value());
+
+                    if(task != nullptr) {
+                        task->assigned = false;
+                        task->assignedTo = -1;
+                        if(task->leader != -1 &&
+                        !this->children[task->leader].functional) task->leader = -1;
+                    }
+
+                    entity.job.reset();
+                    entity.idle = true;
+                }
+
+                entity.leader = leader;
+            }
+        }
+    }
+    for(const auto& [taskKey, taskView] : tasks) {
+        if(taskView.leader == -1) continue;
+
+        Task* task = tasks.try_at(taskKey);
+        if(task == nullptr) continue;
+
+        const int owner = taskView.leader;
+
+        if(!this->children[owner].functional) {
+            task->leader = -1;
+            continue;
         }
 
+        task->leader = this->children[owner].leader;
     }
 }
 
@@ -116,9 +170,14 @@ void System::assignTask(TaskKey taskKey, int target) {
 
     task->assigned = true;
     task->assignedTo = entity.id;
+    
+    if(task->leader == -1) {
+        task->leader = entity.leader;
+    }
 
     entity.idle = false;
     entity.job = taskKey;
+
 }
 
 void System::addTask(const Task &job) {
@@ -129,11 +188,11 @@ void System::addTask(const Task &job) {
         return;
     }
 
-    assignPendingTasks();
+    total_tasks_created++;
 }
 
 void System::assignPendingTasks() {
-    for(auto [taskKey, task] : tasks) {
+    for(const auto& [taskKey, task] : tasks) {
         if(task.assigned || task.completed) continue;
 
         const int target = findNearestEntity(task);
@@ -151,32 +210,62 @@ void System::moveEntities() {
             // Move closer to the task location
             Task* task = tasks.try_at(entity.job.value());
 
+            if(task == nullptr) {
+                entity.job.reset();
+                entity.idle = true;
+                continue;
+            }
+
             if(entity.loc.x > task->loc.x) {
                 entity.loc.x--;
+                total_moves++;
             } else if(entity.loc.x < task->loc.x) {
                 entity.loc.x++;
+                total_moves++;
             } else if(entity.loc.y > task->loc.y) {
                 entity.loc.y--;
+                total_moves++;
             } else if(entity.loc.y < task->loc.y) {
                 entity.loc.y++;
+                total_moves++;
             }
 
             if(entity.loc.x == task->loc.x &&
             entity.loc.y == task->loc.y) {
                 const TaskKey completedTask = entity.job.value();
                 task->completed = true;
+                total_tasks_completed++;
                 entity.idle = true;
                 entity.job.reset();
                 tasks.erase(completedTask);
             }
         }
     }
+}
 
-    assignPendingTasks();
+void System::rebuildAdjacency() {
+    adj.assign(children.size(), {});
+
+    for(int i = 0; i < this->entity_count; i++) {
+        if(!children[i].functional) {
+            continue;
+        }
+
+        for(int j = i + 1; j < this->entity_count; j++) {
+            if(!children[j].functional) {
+                continue;
+            }
+
+            if(connected(children[i].loc, children[j].loc, range)) {
+                adj[i].push_back(j);
+                adj[j].push_back(i);
+            }
+        }
+    }
 }
 
 // Copilot hehe
-void System::exportJSON(int tick) {
+void System::exportJSON(int tick, long long query_time_ns, long long simulation_time_ns, int query_count) {
     static bool firstTick = true;
 
     if(firstTick) {
@@ -196,9 +285,24 @@ void System::exportJSON(int tick) {
         firstEntryWritten = true;
     }
 
+    int activeTasks = 0;
+    for(const auto& [taskKey, task] : tasks) {
+        activeTasks++;
+    }
+
     file << "  {\n";
     file << "    \"tick\": " << tick << ",\n";
     file << "    \"grid_size\": " << grid_size << ",\n";
+    file << "    \"communication_range\": " << range << ",\n";
+    file << "    \"metrics\": {\n";
+    file << "      \"moves\": " << total_moves << ",\n";
+    file << "      \"tasks_created\": " << total_tasks_created << ",\n";
+    file << "      \"tasks_completed\": " << total_tasks_completed << ",\n";
+    file << "      \"active_tasks\": " << activeTasks << ",\n";
+    file << "      \"query_count\": " << query_count << ",\n";
+    file << "      \"query_time_ns\": " << query_time_ns << ",\n";
+    file << "      \"simulation_time_ns\": " << simulation_time_ns << "\n";
+    file << "    },\n";
     file << "    \"entities\": [\n";
 
     for(int i = 0; i < children.size(); i++) {

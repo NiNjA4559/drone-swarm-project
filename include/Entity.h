@@ -14,6 +14,7 @@ class Entity {
     TaskType ability;
     bool idle;
     std::optional<TaskKey> job;
+    int leader;
     
     Entity();
     Entity(int _id, TaskType _ability, Point _loc);

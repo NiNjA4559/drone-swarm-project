@@ -37,6 +37,21 @@
             text-align: right;
             font-variant-numeric: tabular-nums;
         }
+        .topology-control {
+            margin-left: 8px;
+        }
+        #topology-status {
+            margin: 8px 0 0;
+            color: #596273;
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+        }
+        #metrics-status {
+            margin: 4px 0 12px;
+            color: #596273;
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+        }
     </style>
 </head>
 <body>
@@ -52,7 +67,13 @@
             <input id="speed" type="range" min="0.25" max="3" step="0.25" value="1" oninput="setAnimationSpeed(this.value)">
             <span id="speed-value">1x</span>
         </label>
+        <label class="topology-control">
+            <input id="show-topology" type="checkbox" checked onchange="renderFrame(currentTick)">
+            Topology
+        </label>
     </div>
+    <div id="topology-status" aria-live="polite"></div>
+    <div id="metrics-status" aria-live="polite"></div>
     <canvas id="canvas" width="600" height="600"></canvas>
     
     <script src="./simulation.js"></script>
@@ -66,6 +87,7 @@
         let autoplaying = false;
         let autoplayTimer = null;
         let animationSpeed = 1;
+        const defaultCommunicationRange = 3;
 
         function setAnimationSpeed(value) {
             animationSpeed = Number(value);
@@ -94,7 +116,7 @@
 
             groups.forEach(entities => {
                 entities.sort((first, second) => first.id - second.id);
-                const spacing = Math.min(18, (canvas.width / data.grid_size) * 0.28);
+                const spacing = Math.min(18, (canvas.width / data.grid_size) * 0.44);
                 const columns = Math.ceil(Math.sqrt(entities.length));
                 const rows = Math.ceil(entities.length / columns);
                 const centerColumn = (columns - 1) / 2;
@@ -126,7 +148,7 @@
             groups.forEach(tasks => {
                 tasks.sort((first, second) => first.id - second.id);
                 const cellSize = canvas.width / data.grid_size;
-                const spacing = Math.min(14, cellSize * 0.22);
+                const spacing = Math.min(12, cellSize * 0.3);
                 const columns = Math.ceil(Math.sqrt(tasks.length));
                 const centerColumn = (columns - 1) / 2;
                 const centerRow = (Math.ceil(tasks.length / columns) - 1) / 2;
@@ -178,6 +200,8 @@
 
         function drawTasks(data, entityPositions) {
             const cellSize = canvas.width / data.grid_size;
+            const markerSize = Math.max(2, Math.min(6, cellSize * 0.22));
+            const labelSize = Math.max(7, Math.min(11, cellSize * 0.38));
             const taskOffsets = getTaskOffsets(data);
 
             (data.tasks || []).forEach(task => {
@@ -188,6 +212,7 @@
 
                 if (task.assigned && assignedPosition) {
                     ctx.strokeStyle = '#7b8190';
+                    ctx.lineWidth = Math.max(0.7, Math.min(1.5, cellSize * 0.05));
                     ctx.setLineDash([5, 4]);
                     ctx.beginPath();
                     ctx.moveTo(assignedPosition.x, assignedPosition.y);
@@ -197,36 +222,196 @@
                 }
 
                 ctx.fillStyle = getTaskTypeColor(task.type);
-                ctx.fillRect(x - 6, y - 6, 12, 12);
+                ctx.fillRect(x - markerSize, y - markerSize, markerSize * 2, markerSize * 2);
                 ctx.fillStyle = '#20252d';
-                ctx.font = '11px Arial';
+                ctx.font = labelSize + 'px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText('T' + task.id, x, y - 10);
+                ctx.fillText('T' + task.id, x, y - markerSize - 2);
             });
         }
 
-        function drawEntities(data, positions) {
-            positions.forEach((position, entity) => {
-                ctx.fillStyle = entity.functional ? getDroneColor(entity.ability) : '#9aa0aa';
+        function getCommunicationRange(data) {
+            return Number(data.communication_range ?? data.range ?? defaultCommunicationRange);
+        }
+
+        function getNetwork(data) {
+            const entities = data.entities.filter(entity => entity.functional);
+            const parent = new Map(entities.map(entity => [entity.id, entity.id]));
+            const edges = [];
+
+            function find(id) {
+                let root = id;
+                while (parent.get(root) !== root) root = parent.get(root);
+                while (parent.get(id) !== id) {
+                    const next = parent.get(id);
+                    parent.set(id, root);
+                    id = next;
+                }
+                return root;
+            }
+
+            function unite(firstId, secondId) {
+                const firstRoot = find(firstId);
+                const secondRoot = find(secondId);
+                if (firstRoot !== secondRoot) parent.set(secondRoot, firstRoot);
+            }
+
+            const range = getCommunicationRange(data);
+            for (let first = 0; first < entities.length; first++) {
+                for (let second = first + 1; second < entities.length; second++) {
+                    const firstEntity = entities[first];
+                    const secondEntity = entities[second];
+                    const distance = Math.abs(firstEntity.x - secondEntity.x)
+                        + Math.abs(firstEntity.y - secondEntity.y);
+                    if (distance <= range) {
+                        edges.push([firstEntity.id, secondEntity.id]);
+                        unite(firstEntity.id, secondEntity.id);
+                    }
+                }
+            }
+
+            const components = new Map();
+            entities.forEach(entity => {
+                const root = find(entity.id);
+                if (!components.has(root)) components.set(root, []);
+                components.get(root).push(entity);
+            });
+
+            const componentList = [...components.values()];
+            const componentByEntity = new Map();
+            componentList.forEach((component, index) => {
+                component.forEach(entity => componentByEntity.set(entity.id, index));
+            });
+
+            return { edges, components: componentList, componentByEntity, range };
+        }
+
+        function getHull(points, padding) {
+            if (points.length <= 1) return points;
+            const sorted = [...points].sort((first, second) => first.x - second.x || first.y - second.y);
+            const cross = (origin, first, second) =>
+                (first.x - origin.x) * (second.y - origin.y)
+                - (first.y - origin.y) * (second.x - origin.x);
+            const lower = [];
+            const upper = [];
+
+            sorted.forEach(point => {
+                while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
+                    lower.pop();
+                }
+                lower.push(point);
+            });
+            [...sorted].reverse().forEach(point => {
+                while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
+                    upper.pop();
+                }
+                upper.push(point);
+            });
+
+            const hull = lower.slice(0, -1).concat(upper.slice(0, -1));
+            const center = hull.reduce((sum, point) => ({
+                x: sum.x + point.x / hull.length,
+                y: sum.y + point.y / hull.length
+            }), { x: 0, y: 0 });
+            return hull.map(point => {
+                const length = Math.hypot(point.x - center.x, point.y - center.y) || 1;
+                return {
+                    x: point.x + (point.x - center.x) * padding / length,
+                    y: point.y + (point.y - center.y) * padding / length
+                };
+            });
+        }
+
+        function drawTopology(data, positions) {
+            const network = getNetwork(data);
+            const cellSize = canvas.width / data.grid_size;
+            const lineWidth = Math.max(0.7, Math.min(1.5, cellSize * 0.05));
+            const componentColors = ['#168aad', '#e76f51', '#7b2cbf', '#2a9d8f', '#e9c46a'];
+            const componentFills = [
+                'rgba(22, 138, 173, 0.045)',
+                'rgba(231, 111, 81, 0.045)',
+                'rgba(123, 44, 191, 0.045)',
+                'rgba(42, 157, 143, 0.045)',
+                'rgba(233, 196, 106, 0.08)'
+            ];
+            const positionById = new Map([...positions].map(([entity, position]) => [entity.id, position]));
+
+            ctx.save();
+            network.edges.forEach(([firstId, secondId]) => {
+                const first = positionById.get(firstId);
+                const second = positionById.get(secondId);
+                if (!first || !second) return;
+                const componentIndex = network.componentByEntity.get(firstId);
+                ctx.strokeStyle = componentColors[componentIndex % componentColors.length];
+                ctx.globalAlpha = 0.58;
+                ctx.lineWidth = lineWidth;
                 ctx.beginPath();
-                ctx.arc(position.x, position.y, 8, 0, 2 * Math.PI);
+                ctx.moveTo(first.x, first.y);
+                ctx.lineTo(second.x, second.y);
+                ctx.stroke();
+            });
+
+            network.components.forEach((component, index) => {
+                const points = component.map(entity => positions.get(entity)).filter(Boolean);
+                const hull = getHull(points, cellSize * 0.45);
+                if (!hull.length) return;
+                const color = componentColors[index % componentColors.length];
+                ctx.strokeStyle = color;
+                ctx.fillStyle = componentFills[index % componentFills.length];
+                ctx.lineWidth = lineWidth;
+                ctx.globalAlpha = 0.78;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                if (hull.length === 1) {
+                    const entityRadius = Math.max(2, Math.min(8, cellSize * 0.2));
+                    ctx.arc(hull[0].x, hull[0].y, entityRadius + cellSize * 0.22, 0, 2 * Math.PI);
+                } else {
+                    ctx.moveTo(hull[0].x, hull[0].y);
+                    hull.slice(1).forEach(point => ctx.lineTo(point.x, point.y));
+                    ctx.closePath();
+                }
+                ctx.fill();
+                ctx.stroke();
+            });
+            ctx.restore();
+
+            const status = document.getElementById('topology-status');
+            status.textContent = 'Topology: ' + network.components.length
+                + ' component' + (network.components.length === 1 ? '' : 's')
+                + ' | ' + network.edges.length + ' link' + (network.edges.length === 1 ? '' : 's')
+                + ' | range ' + network.range;
+        }
+
+        function drawEntities(data, positions, opacityById) {
+            const cellSize = canvas.width / data.grid_size;
+            const radius = Math.max(2, Math.min(8, cellSize * 0.2));
+            const labelSize = Math.max(7, Math.min(12, cellSize * 0.4));
+            positions.forEach((position, entity) => {
+            const opacity = opacityById.get(entity.id) ?? (entity.functional ? 1 : 0);
+            if (opacity <= 0) return;
+            ctx.save();
+            ctx.globalAlpha = opacity;
+            ctx.fillStyle = entity.functional ? getDroneColor(entity.ability) : '#9aa0aa';
+                ctx.beginPath();
+                ctx.arc(position.x, position.y, radius, 0, 2 * Math.PI);
                 ctx.fill();
 
                 if (!entity.functional) {
                     ctx.strokeStyle = '#b00020';
-                    ctx.lineWidth = 2;
+                    ctx.lineWidth = Math.max(1, radius * 0.22);
                     ctx.beginPath();
-                    ctx.moveTo(position.x - 6, position.y - 6);
-                    ctx.lineTo(position.x + 6, position.y + 6);
-                    ctx.moveTo(position.x + 6, position.y - 6);
-                    ctx.lineTo(position.x - 6, position.y + 6);
+                    ctx.moveTo(position.x - radius * 0.7, position.y - radius * 0.7);
+                    ctx.lineTo(position.x + radius * 0.7, position.y + radius * 0.7);
+                    ctx.moveTo(position.x + radius * 0.7, position.y - radius * 0.7);
+                    ctx.lineTo(position.x - radius * 0.7, position.y + radius * 0.7);
                     ctx.stroke();
                 }
 
                 ctx.fillStyle = '#20252d';
-                ctx.font = '12px Arial';
+                ctx.font = labelSize + 'px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText(entity.id, position.x, position.y + 4);
+                ctx.fillText(entity.id, position.x, position.y + labelSize * 0.32);
+                ctx.restore();
             });
         }
 
@@ -234,11 +419,15 @@
             const startOffsets = getCellOffsets(startData);
             const endOffsets = getCellOffsets(endData);
             const startEntities = new Map(startData.entities.map(entity => [entity.id, entity]));
+            const endEntities = new Map(endData.entities.map(entity => [entity.id, entity]));
             const positions = new Map();
             const endPositions = new Map();
+            const opacityById = new Map();
 
-            endData.entities.forEach(endEntity => {
-                const startEntity = startEntities.get(endEntity.id) || endEntity;
+            const entityIds = new Set([...startEntities.keys(), ...endEntities.keys()]);
+            entityIds.forEach(entityId => {
+                const startEntity = startEntities.get(entityId) || endEntities.get(entityId);
+                const endEntity = endEntities.get(entityId) || startEntity;
                 const startPosition = getEntityPosition(startEntity, startData, startOffsets, progress);
                 const endPosition = getEntityPosition(endEntity, endData, endOffsets, progress);
                 const position = {
@@ -247,11 +436,27 @@
                 };
                 positions.set(endEntity, position);
                 endPositions.set(endEntity.id, position);
+                const wasFunctional = Boolean(startEntity.functional);
+                const isFunctional = Boolean(endEntity.functional);
+                opacityById.set(entityId, wasFunctional === isFunctional
+                    ? (isFunctional ? 1 : 0)
+                    : (isFunctional ? progress : 1 - progress));
             });
 
             drawGrid(endData);
+            if (document.getElementById('show-topology').checked) {
+                drawTopology(endData, positions);
+            }
+            const metrics = endData.metrics || {};
+            document.getElementById('metrics-status').textContent = 'Metrics: '
+                + (metrics.moves ?? 0) + ' moves | '
+                + (metrics.tasks_completed ?? 0) + ' completed / '
+                + (metrics.tasks_created ?? 0) + ' created | '
+                + (metrics.active_tasks ?? 0) + ' active | '
+                + (metrics.simulation_time_ns ?? 0) + ' ns simulation | '
+                + (metrics.query_time_ns ?? 0) + ' ns queries';
             drawTasks(endData, endPositions);
-            drawEntities(endData, positions);
+            drawEntities(endData, positions, opacityById);
             document.getElementById('tick').textContent = progress < 1
                 ? startData.tick + ' -> ' + endData.tick
                 : endData.tick;

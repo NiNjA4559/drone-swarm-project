@@ -15,6 +15,9 @@ class System {
     int grid_size;
     int entity_count;
     int range;
+    long long total_moves = 0;
+    long long total_tasks_created = 0;
+    long long total_tasks_completed = 0;
 
     vector<Entity> children;
     vector<vector<int>> adj;
@@ -29,13 +32,15 @@ class System {
 
     static int distance(const Point &a, const Point &b);
 
+    bool matchesTask(const Task &job, const auto &ability);
+
     void loss(int i);
 
-    int findNearestEntity(const Task& job) const;
+    int findNearestEntity(const Task& job);
 
     void addTask(const Task &job);
 
-    void gossip(Task &job, int source);
+    void gossip();
 
     void assignTask(TaskKey taskKey, int target);
 
@@ -43,7 +48,9 @@ class System {
 
     void moveEntities();
 
-    void exportJSON(int tick);
+    void rebuildAdjacency();
+
+    void exportJSON(int tick, long long query_time_ns, long long simulation_time_ns, int query_count);
     void finalizeJSON();
 
     private:

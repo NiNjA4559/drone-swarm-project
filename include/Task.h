@@ -1,7 +1,6 @@
 #ifndef TASK_H
 #define TASK_H
 
-#include <vector>
 #include "TaskType.h"
 #include "Point.h"
 
@@ -14,7 +13,7 @@ class Task {
     Point loc;
     bool completed;
     bool assigned;
-    vector<int> knownEntities;
+    int leader;
     int assignedTo;
 
     Task();

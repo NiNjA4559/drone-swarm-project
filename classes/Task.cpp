@@ -6,7 +6,8 @@ Task::Task()
 			loc(-1, -1),
 			completed(false),
 			assigned(false),
-			assignedTo(-1) {}
+			assignedTo(-1),
+			leader(-1) {}
 
 Task::Task(int _id, Point _loc, TaskType _type)
 		: type(_type),
@@ -14,4 +15,5 @@ Task::Task(int _id, Point _loc, TaskType _type)
 			loc(_loc),
 			completed(false),
 			assigned(false),
-			assignedTo(-1) {}
+			assignedTo(-1),
+			leader(-1) {}
