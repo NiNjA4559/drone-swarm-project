@@ -3,10 +3,12 @@
 
 using namespace std;
 
-int main() {
+int main(int argc, char* argv[]) {
     // Fast I/O
     ios_base::sync_with_stdio(false);
     cin.tie(nullptr);
+
+    const string runLabel = argc > 1 ? argv[1] : "";
 
     //
     int n, k, R, t, q;
@@ -30,6 +32,9 @@ int main() {
 
     model.rebuildAdjacency();
     //model.gossip();
+
+    long long totalQueryTimeNs = 0;
+    long long totalSimulationTimeNs = 0;
 
     for(int tick = 1; tick <= t; tick++) {
         cout << "Tick " << tick << ":\n";
@@ -85,11 +90,15 @@ int main() {
         const auto tickEnd = chrono::steady_clock::now();
         const auto simulationTimeNs = chrono::duration_cast<chrono::nanoseconds>(tickEnd - tickStart).count();
 
+        totalQueryTimeNs += queryTimeNs;
+        totalSimulationTimeNs += simulationTimeNs;
+
         // Create a single JSON history file for visualisation
         model.exportJSON(tick, queryTimeNs, simulationTimeNs, tickQueryCount);
     }
 
     model.finalizeJSON();
+    model.recordBenchmark(runLabel, totalSimulationTimeNs, totalQueryTimeNs, t);
     return 0;
 }
 

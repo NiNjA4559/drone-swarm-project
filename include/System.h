@@ -1,6 +1,7 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
+#include <string>
 #include "Entity.h"
 #include "Point.h"
 #include "Task.h"
@@ -52,6 +53,7 @@ class System {
 
     void exportJSON(int tick, long long query_time_ns, long long simulation_time_ns, int query_count);
     void finalizeJSON();
+    void recordBenchmark(const std::string &label, long long total_simulation_time_ns, long long total_query_time_ns, int ticks_run);
 
     private:
     vector<bool> vis;

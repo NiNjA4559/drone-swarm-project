@@ -52,6 +52,24 @@
             font-size: 13px;
             font-variant-numeric: tabular-nums;
         }
+        #benchmark-chart {
+            display: block;
+            margin: 12px 0;
+            border: 1px solid #d9dee7;
+        }
+        #benchmark-table {
+            border-collapse: collapse;
+            margin: 8px 0 24px;
+            font-size: 13px;
+        }
+        #benchmark-table th, #benchmark-table td {
+            border: 1px solid #d9dee7;
+            padding: 6px 10px;
+            text-align: right;
+        }
+        #benchmark-table th:first-child, #benchmark-table td:first-child {
+            text-align: left;
+        }
     </style>
 </head>
 <body>
@@ -75,8 +93,27 @@
     <div id="topology-status" aria-live="polite"></div>
     <div id="metrics-status" aria-live="polite"></div>
     <canvas id="canvas" width="600" height="600"></canvas>
-    
+
+    <h2>Benchmark History</h2>
+    <p id="benchmark-empty" style="color:#596273; font-size:13px;">No benchmark runs recorded yet. Run <code>mingw32-make run LABEL="description of change"</code> to add one against the fixed testcase.</p>
+    <canvas id="benchmark-chart" width="900" height="220"></canvas>
+    <table id="benchmark-table">
+        <thead>
+            <tr>
+                <th>Label</th>
+                <th>Timestamp</th>
+                <th>Ticks</th>
+                <th>Moves</th>
+                <th>Completed / Created</th>
+                <th>Query Time (ns)</th>
+                <th>Sim Time (ns)</th>
+            </tr>
+        </thead>
+        <tbody id="benchmark-table-body"></tbody>
+    </table>
+
     <script src="./simulation.js"></script>
+    <script src="./benchmarks.js"></script>
     <script>
         const frames = simulationData || [];
         const canvas = document.getElementById('canvas');
@@ -531,6 +568,87 @@
         }
 
         if(frames.length > 0) renderFrame(0);
+
+        function renderBenchmarkChart(history) {
+            const chartCanvas = document.getElementById('benchmark-chart');
+            const chartCtx = chartCanvas.getContext('2d');
+            chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+
+            const padding = 40;
+            const chartWidth = chartCanvas.width - padding * 2;
+            const chartHeight = chartCanvas.height - padding * 2;
+            const barGroupWidth = chartWidth / history.length;
+            const maxSimTime = Math.max(...history.map(run => run.total_simulation_time_ns || 0), 1);
+
+            chartCtx.strokeStyle = '#d9dee7';
+            chartCtx.beginPath();
+            chartCtx.moveTo(padding, padding);
+            chartCtx.lineTo(padding, padding + chartHeight);
+            chartCtx.lineTo(padding + chartWidth, padding + chartHeight);
+            chartCtx.stroke();
+
+            chartCtx.fillStyle = '#20252d';
+            chartCtx.font = '11px Arial';
+            chartCtx.textAlign = 'left';
+            chartCtx.fillText('Total simulation time (ns) per run (latest run highlighted)', padding, padding - 12);
+
+            history.forEach((run, index) => {
+                const barWidth = Math.min(48, barGroupWidth * 0.6);
+                const barHeight = ((run.total_simulation_time_ns || 0) / maxSimTime) * chartHeight;
+                const x = padding + index * barGroupWidth + (barGroupWidth - barWidth) / 2;
+                const y = padding + chartHeight - barHeight;
+
+                chartCtx.fillStyle = index === history.length - 1 ? '#1e90ff' : '#8a2be2';
+                chartCtx.fillRect(x, y, barWidth, barHeight);
+
+                chartCtx.fillStyle = '#596273';
+                chartCtx.textAlign = 'center';
+                chartCtx.font = '10px Arial';
+                const rawLabel = run.label || '';
+                const label = rawLabel.length > 10 ? rawLabel.slice(0, 9) + '\u2026' : rawLabel;
+                chartCtx.fillText(label, x + barWidth / 2, padding + chartHeight + 14);
+            });
+        }
+
+        function renderBenchmarkTable(history) {
+            const body = document.getElementById('benchmark-table-body');
+            body.innerHTML = '';
+
+            history.forEach(run => {
+                const row = document.createElement('tr');
+                const cells = [
+                    run.label ?? '',
+                    run.timestamp ?? '',
+                    run.ticks ?? '',
+                    run.total_moves ?? 0,
+                    (run.tasks_completed ?? 0) + ' / ' + (run.tasks_created ?? 0),
+                    run.total_query_time_ns ?? 0,
+                    run.total_simulation_time_ns ?? 0
+                ];
+                cells.forEach(value => {
+                    const cell = document.createElement('td');
+                    cell.textContent = String(value);
+                    row.appendChild(cell);
+                });
+                body.appendChild(row);
+            });
+        }
+
+        function renderBenchmarks() {
+            const history = (typeof benchmarkData !== 'undefined' && benchmarkData) || [];
+            const hasHistory = history.length > 0;
+
+            document.getElementById('benchmark-empty').style.display = hasHistory ? 'none' : 'block';
+            document.getElementById('benchmark-chart').style.display = hasHistory ? 'block' : 'none';
+            document.getElementById('benchmark-table').style.display = hasHistory ? 'table' : 'none';
+
+            if (!hasHistory) return;
+
+            renderBenchmarkChart(history);
+            renderBenchmarkTable(history);
+        }
+
+        renderBenchmarks();
     </script>
 </body>
 </html>

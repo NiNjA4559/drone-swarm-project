@@ -6,6 +6,9 @@
 #include <algorithm>
 #include <fstream>
 #include <sstream>
+#include <iomanip>
+#include <chrono>
+#include <ctime>
 #include <type_traits>
 #include "System.h"
 #include "SlotMap.hpp"
@@ -379,5 +382,68 @@ void System::exportJSON(int tick, long long query_time_ns, long long simulation_
 void System::finalizeJSON() {
     ofstream file("visualisation/simulation.js", ios::app);
     file << "\n];\n";
+    file.close();
+}
+
+namespace {
+    string currentTimestamp() {
+        const auto now = chrono::system_clock::now();
+        const time_t nowTime = chrono::system_clock::to_time_t(now);
+        tm localTime{};
+#if defined(_WIN32)
+        localtime_s(&localTime, &nowTime);
+#else
+        localtime_r(&nowTime, &localTime);
+#endif
+        ostringstream out;
+        out << put_time(&localTime, "%Y-%m-%d %H:%M:%S");
+        return out.str();
+    }
+}
+
+// Appends one summary entry per execution to visualisation/benchmarks.js so
+// runs from different code versions can be compared against the same testcase.
+void System::recordBenchmark(const string &label, long long total_simulation_time_ns, long long total_query_time_ns, int ticks_run) {
+    const string path = "visualisation/benchmarks.js";
+
+    ifstream in(path);
+    string existing((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
+    in.close();
+
+    ostringstream entry;
+    entry << "  {\n";
+    entry << "    \"label\": \"" << (label.empty() ? currentTimestamp() : label) << "\",\n";
+    entry << "    \"timestamp\": \"" << currentTimestamp() << "\",\n";
+    entry << "    \"grid_size\": " << grid_size << ",\n";
+    entry << "    \"entity_count\": " << entity_count << ",\n";
+    entry << "    \"communication_range\": " << range << ",\n";
+    entry << "    \"ticks\": " << ticks_run << ",\n";
+    entry << "    \"total_moves\": " << total_moves << ",\n";
+    entry << "    \"tasks_created\": " << total_tasks_created << ",\n";
+    entry << "    \"tasks_completed\": " << total_tasks_completed << ",\n";
+    entry << "    \"total_query_time_ns\": " << total_query_time_ns << ",\n";
+    entry << "    \"total_simulation_time_ns\": " << total_simulation_time_ns << "\n";
+    entry << "  }";
+
+    const size_t arrayStart = existing.find('[');
+    const size_t arrayEnd = existing.rfind(']');
+
+    ostringstream out;
+    out << "const benchmarkData = [\n";
+
+    if(arrayStart != string::npos && arrayEnd != string::npos && arrayEnd > arrayStart) {
+        string body = existing.substr(arrayStart + 1, arrayEnd - arrayStart - 1);
+        const size_t lastNonSpace = body.find_last_not_of(" \t\n\r");
+        body = (lastNonSpace != string::npos) ? body.substr(0, lastNonSpace + 1) : string();
+
+        if(!body.empty()) {
+            out << body << ",\n";
+        }
+    }
+
+    out << entry.str() << "\n];\n";
+
+    ofstream file(path, ios::out | ios::trunc);
+    file << out.str();
     file.close();
 }
