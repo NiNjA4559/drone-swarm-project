@@ -1,4 +1,4 @@
-#include <bits/stdc++.h>
+#include <iostream>
 #include "System.h"
 
 using namespace std;
@@ -19,11 +19,20 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    if(n <= 0 || k < 0 || R < 0 || t <= 0) {
+        cerr << "Invalid simulation dimensions or tick count\n";
+        return 1;
+    }
+
     System model(n, k, R);
 
     for(int i = 0; i < k; i++) {
         if(!(cin >> ability >> x >> y)) {
             cerr << "Input ended while reading entities\n";
+            return 1;
+        }
+        if(ability < Delivery || ability > Relay || x < 0 || x >= n || y < 0 || y >= n) {
+            cerr << "Invalid ability or entity location for entity " << i << "\n";
             return 1;
         }
         model.children.push_back(Entity(i, static_cast<TaskType>(ability), Point(x, y)));
@@ -40,6 +49,10 @@ int main(int argc, char* argv[]) {
         cout << "Tick " << tick << ":\n";
         if(!(cin >> q)) {
             cerr << "Input ended before tick " << tick << "\n";
+            return 1;
+        }
+        if(q < 0) {
+            cerr << "Invalid query count on tick " << tick << "\n";
             return 1;
         }
         const int tickQueryCount = q;
@@ -59,6 +72,10 @@ int main(int argc, char* argv[]) {
                     cerr << "Invalid loss query on tick " << tick << "\n";
                     return 1;
                 }
+                if(id < 0 || id >= k) {
+                    cerr << "Invalid entity id in loss query on tick " << tick << "\n";
+                    return 1;
+                }
                 model.loss(id);
             } else if(query_type == 2) {
                 if(!(cin >> task_id >> w >> x >> y)) {
@@ -66,19 +83,24 @@ int main(int argc, char* argv[]) {
                     return 1;
                 }
 
-                model.addTask(Task(task_id, Point(x, y), static_cast<TaskType>(w)));
-            } else if(query_type == 3) {
-                if(!(cin >> id >> x >> y)) {
-                    cerr << "Invalid recovery query on tick " << tick << "\n";
+                if(w < Delivery || w > Relay || x < 0 || x >= n || y < 0 || y >= n) {
+                    cerr << "Invalid task type or location on tick " << tick << "\n";
                     return 1;
                 }
+
+                model.addTask(Task(task_id, Point(x, y), static_cast<TaskType>(w)));
+            } else if(query_type == 3) {
+                cerr << "Recovery queries (type 3) are not supported in this release\n";
+                return 2;
+            } else {
+                cerr << "Unknown query type " << query_type << " on tick " << tick << "\n";
+                return 1;
             }
 
             const auto end = chrono::steady_clock::now();
 
             auto duration_ns = chrono::duration_cast<chrono::nanoseconds>(end - start);
             queryTimeNs += duration_ns.count();
-            cout << "Query Type: " << query_type << ", " << "Time: " << duration_ns.count() << " ns\n";
 
         }
 
@@ -99,6 +121,9 @@ int main(int argc, char* argv[]) {
 
     model.finalizeJSON();
     model.recordBenchmark(runLabel, totalSimulationTimeNs, totalQueryTimeNs, t);
+    cout << "Run complete: " << model.total_moves << " moves, "
+         << model.total_tasks_completed << " tasks completed, "
+         << totalSimulationTimeNs << " ns simulation time\n";
     return 0;
 }
 
@@ -108,10 +133,10 @@ int main(int argc, char* argv[]) {
 1. grid_size(n) entity_count(k) communication_range(R) number_of_ticks(t)
     k lines having (ability_i x_i y_i) representing the ability of the entity i and its location at t = 0
 for all t in [1, t]:
-2. q (followed by q lines containing one of the three types of queries on all q lines)
+2. q (followed by q lines containing supported query types)
     1 i (Loss of ith entity)
     2 task_id w x y (New task of type w available at (x, y))
-    3 i x y (ith entity that was lost previously is found working at (x, y))
+    3 i x y (Recovery; reserved but unsupported in this release)
 */
 
 // Remarks

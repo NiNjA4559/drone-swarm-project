@@ -4,13 +4,15 @@
 1. grid_size(n) entity_count(k) communication_range(R) number_of_ticks(t)
     k lines having (ability_i x_i y_i) representing the ability of the entity i and its location at t = 0
 for all t in [1, t]:
-2. q (followed by q lines containing one of the three types of queries on all q lines)
+2. q (followed by q lines containing supported query types)
     1 i (Loss of ith entity)
-    2 x y (New task available at (x, y))
-    3 i x y (ith entity that was lost previously is found working at (x, y))
+    2 task_id w x y (New task of type w available at (x, y))
+
+Recovery queries (type 3) are not supported by this release.
 */
 
 const fs = require("fs");
+const path = require("path");
 
 let inputText = "";
 
@@ -91,15 +93,9 @@ for(let i = 0; i < t; i++) {
                 Math.floor(Math.random() * n)
             ].join(" ") + "\n";
 
-        } else if(qtype == 3) {
-            // implement it later cuz then i will have to check if the come backies location is already occupied or not
-            /*return;
-            let losties = Object.keys(lost_entities);
-            let random_come_backies = losties[Math.floor(Math.random() * losties.length)];
-
-            console.log(random_come_backies, Math.floor(Math.random() * n), Math.floor(Math.random() * n))*/
         }
     }
 }
 
-fs.writeFileSync('../input.txt', inputText);
+const outputPath = process.argv[2] || path.join(__dirname, "../input.txt");
+fs.writeFileSync(outputPath, inputText);

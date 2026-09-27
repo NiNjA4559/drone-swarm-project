@@ -399,6 +399,33 @@ namespace {
         out << put_time(&localTime, "%Y-%m-%d %H:%M:%S");
         return out.str();
     }
+
+    // Escapes characters that would otherwise break the generated JS string literal.
+    string escapeJsonString(const string &value) {
+        string escaped;
+        escaped.reserve(value.size());
+        constexpr char hexDigits[] = "0123456789abcdef";
+        for(unsigned char c : value) {
+            switch(c) {
+                case '"': escaped += "\\\""; break;
+                case '\\': escaped += "\\\\"; break;
+                case '\b': escaped += "\\b"; break;
+                case '\f': escaped += "\\f"; break;
+                case '\t': escaped += "\\t"; break;
+                case '\n': escaped += "\\n"; break;
+                case '\r': escaped += "\\r"; break;
+                default:
+                    if(c < 0x20) {
+                        escaped += "\\u00";
+                        escaped += hexDigits[c >> 4];
+                        escaped += hexDigits[c & 0x0f];
+                    } else {
+                        escaped += static_cast<char>(c);
+                    }
+            }
+        }
+        return escaped;
+    }
 }
 
 // Appends one summary entry per execution to visualisation/benchmarks.js so
@@ -412,7 +439,7 @@ void System::recordBenchmark(const string &label, long long total_simulation_tim
 
     ostringstream entry;
     entry << "  {\n";
-    entry << "    \"label\": \"" << (label.empty() ? currentTimestamp() : label) << "\",\n";
+    entry << "    \"label\": \"" << escapeJsonString(label.empty() ? currentTimestamp() : label) << "\",\n";
     entry << "    \"timestamp\": \"" << currentTimestamp() << "\",\n";
     entry << "    \"grid_size\": " << grid_size << ",\n";
     entry << "    \"entity_count\": " << entity_count << ",\n";

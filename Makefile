@@ -4,6 +4,8 @@ SRCS = main.cpp $(wildcard classes/*.cpp) $(wildcard helpers/*.cpp)
 INPUT = input.txt
 TARGET = main.exe
 
+.PHONY: all build run clean
+
 # Default rule: builds and immediately runs
 all: build run
 
