@@ -61,27 +61,44 @@ void System::loss(int i) {
 
 int System::findNearestEntity(const Task &job) {
 
-    // Brute-force find
+    /*
+    Case 1: The task has no leader OR The entity doing the task got lost and it was its own leader:
+        -> Nearest entity regardless of its topology is selected.
+    
+    Case 2: The entity doing the task got lost and it was not its own leader
+        -> Nearest entity in the topology is selected.
+        -> If none found, falls back to global selection.
+    */
+    auto findNearest = [&](bool restrictToTaskTopology) {
+        int nearestEntity = -1;
+        int nearestDistance = INT_MAX;
 
-    int nearest_entity = -1;
-    int dist = INT_MAX;
+        for(const auto& entity : children) {
+            if(!entity.functional ||
+               !entity.idle ||
+               !matchesTask(job, entity.ability) ||
+               (restrictToTaskTopology && entity.leader != job.leader)) {
+                continue;
+            }
 
-    for(const auto &entity : this->children) {
-        if(!entity.functional ||
-        !entity.idle ||
-        !this->matchesTask(job, entity.ability) ||
-        (job.leader != -1 && entity.leader != job.leader)) {
-            continue;
+            const int currentDistance = distance(job.loc, entity.loc);
+            if(currentDistance < nearestDistance) {
+                nearestEntity = entity.id;
+                nearestDistance = currentDistance;
+            }
         }
 
-        const int currentDistance = distance(job.loc, entity.loc);
+        return nearestEntity;
+    };
 
-        if(currentDistance < dist) {
-            nearest_entity = entity.id;
-            dist = currentDistance;
+    if(job.leader != -1) {
+        const int topologyCandidate = findNearest(true);
+        if(topologyCandidate != -1) {
+            return topologyCandidate;
         }
     }
-    return nearest_entity;
+
+    return findNearest(false);
 
 }
 
@@ -171,9 +188,7 @@ void System::assignTask(TaskKey taskKey, int target) {
     task->assigned = true;
     task->assignedTo = entity.id;
     
-    if(task->leader == -1) {
-        task->leader = entity.leader;
-    }
+    task->leader = entity.leader;
 
     entity.idle = false;
     entity.job = taskKey;
