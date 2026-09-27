@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -std=c++23 -I include -I imports
-SRCS = main.cpp $(wildcard classes/*.cpp) $(wildcard helpers/*.cpp)
+SRCS = main.cpp $(wildcard classes/*.cpp)
 INPUT = input.txt
 TARGET = main.exe
 

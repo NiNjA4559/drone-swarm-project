@@ -8,8 +8,8 @@ against a fixed testcase.
 
 ## Prerequisites
 
-- A C++23 compiler. This project uses `<bits/stdc++.h>`, so a GCC-based toolchain
-  (e.g. MinGW-w64 on Windows) is required.
+- A C++23 compiler with `std::ranges::contains` support (GCC 13+, invoked as `g++` by
+  the Makefile; MinGW-w64 on Windows).
 - `make` (`mingw32-make` on Windows via MinGW).
 - A modern browser to open the visualizer (no server required).
 - Node.js, only if you want to regenerate `input.txt` with `generator/index.js`.
@@ -48,7 +48,12 @@ Entity indices are 0-indexed. A fixed example testcase is checked in as `input.t
 query types 1 and 2 are supported. Recovery (query type 3) is reserved for a future
 release and currently causes the simulator to stop with an explicit error; do not use
 type-3 queries in input files. The random testcase generator also emits only query types
-1 and 2. Regenerate a random testcase with:
+1 and 2.
+
+Exit codes: `0` on a completed run, `1` for malformed/invalid input, `2` specifically
+when a type-3 recovery query is encountered.
+
+Regenerate a random testcase with:
 
 ```
 cd generator

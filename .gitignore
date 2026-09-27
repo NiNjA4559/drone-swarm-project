@@ -13,6 +13,7 @@ visualisation/benchmarks.js
 # Personal scratch notes
 doubts.txt
 should_I_make_these_changes.md
+KNOWN_ISSUES.md
 
 # Node (generator/)
 generator/node_modules/
