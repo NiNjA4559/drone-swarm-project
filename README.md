@@ -1,4 +1,4 @@
-# Drone Swarm Project
+# Pseudo-Decentralized Swarm Network
 
 A C++23 simulation of a decentralized drone swarm. Drones (entities) communicate over
 a limited-range network, elect a leader within each connected topology via gossip, and
