@@ -5,14 +5,14 @@
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NiNjA4559/drone-swarm-project.git"
+    "url": "git+https://github.com/NiNjA4559/pseudec-net.git"
   },
   "keywords": [],
   "author": "",
   "license": "MIT",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/NiNjA4559/drone-swarm-project/issues"
+    "url": "https://github.com/NiNjA4559/pseudec-net/issues"
   },
-  "homepage": "https://github.com/NiNjA4559/drone-swarm-project#readme"
+  "homepage": "https://github.com/NiNjA4559/pseudec-net#readme"
 }
